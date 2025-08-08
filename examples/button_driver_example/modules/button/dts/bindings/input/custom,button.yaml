@@ -1,0 +1,8 @@
+description: Custom button
+compatible: "custom,button"
+
+properties:
+  gpios:
+    type: phandle-array
+    required: true
+    description: GPIO connected to the button (flags here)
