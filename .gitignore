@@ -1,0 +1,9 @@
+# Zephyr build directories
+build/
+**/build/
+#VS Code settings
+.vscode/
+
+# Temporary files
+*.log
+*.swp
