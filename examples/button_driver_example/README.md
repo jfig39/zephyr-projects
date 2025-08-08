@@ -13,7 +13,7 @@ It uses a devicetree binding for `"custom,button"` and a driver that polls the G
   - [Hardware Setup](#hardware-setup)
   - [Project Layout](#project-layout)
   - [Build / Flash / Run](#build--flash--run)
-  - [Expected Output](#expected-output)
+    - [Open a serial monitor (nRF Connect SDK)](#open-a-serial-monitor-nrf-connect-sdk)
   - [Gotchas \& Troubleshooting](#gotchas--troubleshooting)
   - [License](#license)
 
@@ -79,11 +79,21 @@ Flash the board:
 west flash
 ```
 
-Open a serial monitor:
+### Open a serial monitor (nRF Connect SDK)
+
+If using **nRF Connect SDK** with `west`, you can run:
+
 ```bash
-screen /dev/ttyACM0 115200
-```
-(Replace `/dev/ttyACM0` with your actual device path.)
+west build -t nrf52_serial_terminal
+Or, if you have the Nordic VS Code extension installed, you can:
+
+Click the "Serial Terminal" tab in the nRF Connect extension panel.
+
+Select your connected board from the list.
+
+Set baud rate to 115200.
+
+Click Connect.
 
 ---
 
