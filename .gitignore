@@ -1,9 +1,41 @@
-# Zephyr build directories
+#=======================
+Zephyr / CMake build artifacts
+#=======================
 build/
 **/build/
-#VS Code settings
-.vscode/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+Makefile
+zephyr/
 
+#=======================
+#VS Code settings
+#=======================
+.vscode/
+*.code-workspace
+
+#=======================
 # Temporary files
+#=======================
 *.log
 *.swp
+*.tmp
+*~
+.DS_Store
+
+#=======================
+# Python virtual enviroments
+# ======================
+.venv/
+venv/
+__pycache__/
+
+#=======================
+# Other generated artifacts
+#=======================
+*.elf
+*.bin
+*.hex
+*.map
