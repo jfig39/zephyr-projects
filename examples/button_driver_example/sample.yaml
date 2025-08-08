@@ -1,0 +1,8 @@
+sample:
+  name: Button Driver Example
+  description: >
+    Demonstrates creating a custom GPIO button driver in Zephyr,
+    including devicetree integration and usage in an application.
+  boards:
+    - nrf52840dk_nrf52840
+  tags: drivers gpio
