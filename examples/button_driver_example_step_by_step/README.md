@@ -1,6 +1,6 @@
 # Zephyr Custom Driver Tutorial — Button Driver Example (nRF Connect in VS Code)
 
-This tutorial walks you through creating a **custom GPIO button driver** in Zephyr RTOS from scratch, using only the **nRF Connect extension in VS Code**.
+This tutorial walks you through creating a **custom GPIO button driver** in Zephyr RTOS from scratch, using only the **nRF Connect extension in VS Code**. Based off of this tutorial series  [Watch on YouTube](https://www.youtube.com/watch?v=vXAg_UbEurc&list=PLEBQazB0HUyTmK2zdwhaf8bLwuEaDH-52&index=6)  
 
 ---
 
@@ -15,21 +15,23 @@ This tutorial walks you through creating a **custom GPIO button driver** in Zeph
   - [**2. Project Structure**](#2-project-structure)
     - [Inital Project File Structure](#inital-project-file-structure)
   - [**3. Add a Custom Driver Module**](#3-add-a-custom-driver-module)
-  - [Quick mental model (why this works)](#quick-mental-model-why-this-works)
+    - [Explanation of Driver's Source File](#explanation-of-drivers-source-file)
+    - [Create Driver's Header File](#create-drivers-header-file)
   - [**4. Create a Devicetree Binding**](#4-create-a-devicetree-binding)
-  - [How it ties together in your project:](#how-it-ties-together-in-your-project)
+  - [Explanation of Device Tree Binding](#explanation-of-device-tree-binding)
   - [**5. Module’s CMake Files**](#5-modules-cmake-files)
-    - [**A) Module Layout**](#a-module-layout)
+    - [**Module Layout**](#module-layout)
   - [**6. Create Kconfig Files in Module Directory**](#6-create-kconfig-files-in-module-directory)
   - [**7. Create the Device Tree Overlay**](#7-create-the-device-tree-overlay)
-  - [Key Points](#key-points)
+    - [Key Points on Overlay](#key-points-on-overlay)
   - [**8. Modify the Application Code**](#8-modify-the-application-code)
   - [**9. Add the Driver to the prj.conf**](#9-add-the-driver-to-the-prjconf)
   - [**10. Build the Project**](#10-build-the-project)
   - [**11. Flash the Board**](#11-flash-the-board)
   - [**12. Open a Serial Monitor and Inspect Output**](#12-open-a-serial-monitor-and-inspect-output)
   - [**10. Troubleshooting**](#10-troubleshooting)
-  - [**11. License**](#11-license)
+  - [**11. Useful Links**](#11-useful-links)
+  - [**12. License**](#12-license)
 
 ---
 
@@ -216,7 +218,7 @@ DT_INST_FOREACH_STATUS_OKAY(BUTTON_DEFINE)
 
 ```
 
-## Quick mental model (why this works)
+### Explanation of Driver's Source File
 Devicetree → Config: GPIO_DT_SPEC_GET(DT_DRV_INST(inst), gpios) pulls the pin + flags you declared in your .overlay/binding into a typed gpio_dt_spec.
 
 Init timing: POST_KERNEL ensures GPIO drivers are up before your button_init runs.
@@ -224,6 +226,8 @@ Init timing: POST_KERNEL ensures GPIO drivers are up before your button_init run
 API surface: Your struct button_api lets app code call button->get(...) uniformly, regardless of which instance or pin it’s bound to.
 
 Multiple instances for free: Add more custom,button nodes in DT; the DT_INST_FOREACH_STATUS_OKAY macro spits out one device per node automatically.
+
+### Create Driver's Header File
 
 4. Example `button.h`:
 
@@ -371,7 +375,7 @@ build:
 
 ```
 
-## How it ties together in your project:
+## Explanation of Device Tree Binding
 
 name: button → This is the module name Zephyr will list when it discovers modules via west.
 
@@ -388,7 +392,7 @@ Zephyr’s build system discovers this module from `module.yaml`, then executes 
 
 ---
 
-### **A) Module Layout**
+### **Module Layout**
 
 ```plaintext
 modules/
@@ -461,6 +465,7 @@ target_sources(app PRIVATE src/main.c)
 ```
 
 ## **6. Create Kconfig Files in Module Directory**
+
 The Kconfig files allows the Zephyr kernel and subsystems to be configured at build time. We add Kconfig files to our button driver to allow it to be turned on and off in the projects prj.conf and through menuconfig
 
 Start in the `modules/button/drivers/button` directory and add the firsts Kconfig.
@@ -565,15 +570,16 @@ modules
 
 ```
 
-## Key Points
+### Key Points on Overlay
 
 - ensure that the compatible proprety matches the name in you `dts/bindings/custom,button.yaml` and `button.c` file in the `module` directory (in `button.c`, `#define DT_DRV_COMPAT custom_button`)
 - Note that in `GPIO_DT_SPEC_GET()` you can assign the button to be either active low or active high depending on your requirements
 - Adding an alias will allow the app code to use `DEVICE_DT_GET(DT_ALIAS(my_button_1))` instead of hardcoding the path to the node.
 
 ## **8. Modify the Application Code**
-1
-In `src/main.c`, write the application code
+
+
+1. In `src/main.c`, write the application code
 
 ```c
 #include <stdio.h>
@@ -704,6 +710,22 @@ The file can be found in `root\build\button_driver_example\zephyr`
 
 ---
 
-## **11. License**
+## **11. Useful Links**
+
+1. **Shawn Hymel — "Introduction to Zephyr Part 6: How to Write a Device Driver" (DigiKey)**  
+   [Watch on YouTube](https://www.youtube.com/watch?v=vXAg_UbEurc&list=PLEBQazB0HUyTmK2zdwhaf8bLwuEaDH-52&index=6)  
+   - This tutorial series is an excellent starting point for understanding the basics of drivers and how they integrate with **Kconfig**, **CMake**, and the **Devicetree**.
+
+2. **Zephyr Devicetree Guide**  
+   - Official guide on Devicetree implementation:  
+     [https://docs.zephyrproject.org/latest/build/dts/index.html#devicetree-guide](https://docs.zephyrproject.org/latest/build/dts/index.html#devicetree-guide)
+
+3. **Zephyr Device Driver Model Documentation**  
+   - Comprehensive reference for Zephyr’s driver model:  
+     [https://docs.zephyrproject.org/latest/kernel/drivers/index.html](https://docs.zephyrproject.org/latest/kernel/drivers/index.html)
+
+---
+
+## **12. License**
 
 MIT License — feel free to use and modify.
