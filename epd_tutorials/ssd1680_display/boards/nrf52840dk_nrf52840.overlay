@@ -1,0 +1,61 @@
+#include <zephyr/dt-bindings/gpio/gpio.h>
+
+/ {
+    chosen {
+        zephyr,display = &epd;
+    };
+
+    mipi_dbi_epd: mipi_dbi_epd {
+        compatible = "zephyr,mipi-dbi-spi";
+        spi-dev = <&spi1>;
+        dc-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+        reset-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        epd: ssd16xxfb@0 {
+            compatible = "solomon,ssd1680";
+            status = "okay";
+            reg = <0>;
+            label = "EPD0";
+
+            /* REQUIRED / USED BY DRIVER */
+            width = <256>;
+            height = <128>;
+            rotation = <0>;
+            busy-gpios = <&gpio1 15 GPIO_ACTIVE_HIGH>;
+            mipi-max-frequency = <4000000>;
+
+            /* Optional SSD16xx specifics */
+            tssv = <0x80>;
+            full    { border-waveform = <0x05>; };
+            partial { border-waveform = <0x3c>; };
+        };
+    };
+};
+
+&spi1 {
+    status = "okay";
+    cs-gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
+    pinctrl-0 = <&spi1_default>;
+    pinctrl-1 = <&spi1_sleep>;
+    pinctrl-names = "default", "sleep";
+};
+
+
+&pinctrl {
+    spi1_default: spi1_default {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 1, 10)>,
+                    <NRF_PSEL(SPIM_MOSI, 1, 11)>;
+        };
+    };
+
+    spi1_sleep: spi1_sleep {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 1, 10)>,
+                    <NRF_PSEL(SPIM_MOSI, 1, 11)>;
+            low-power-enable;
+        };
+    };
+};
