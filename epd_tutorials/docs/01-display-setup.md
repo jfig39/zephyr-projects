@@ -1,10 +1,42 @@
 # Setting up the SSD1680 e-paper with LVGL and Zephyr
 
+## Table of Contents
+
+- [Target Stack](#target-stack)
+- [Overview](#overview)
+- [Project Objectives](#project-objectives)
+- [Hardware & wiring](#hardware-wiring)
+- [How the pieces fit](#how-the-pieces-fit)
+- [Project Structure](#project-structure)
+- [Creating the Overlay](#creating-the-overlay)
+  - [Selecting the Chosen Display](#selecting-the-chosen-display)
+  - [MIPI DBI](#mipi-dbi)
+  - [Defining the ePaper's Frame Buffer](#defining-the-epapers-frame-buffer)
+  - [Key Zephyr Files for SSD16xx Displays](#key-zephyr-files-for-ssd16xx-displays)
+  - [SPI Bus and Pin Configuration](#spi-bus-and-pin-configuration)
+  - [Full Overlay Code](#full-overlay-code)
+- [Setting Up the Configuration](#setting-up-the-configuration)
+  - [`prj.conf` Configuration Summary](#prjconf-configuration-summary)
+  - [Full `prj.conf` file](#full-prjconf-file)
+  - [Common Questions / gotchas](#common-questions-gotchas)
+- [`main.c`](#mainc)
+  - [How LVGL -> Zephyr -> SSD1680 are connected](#how-lvgl-zephyr-ssd1680-are-connected)
+  - [The `flush` callback: what it does and why](#the-flush-callback-what-it-does-and-why)
+  - [Implementation of `epd_flush_cb`](#implementation-of-epdflushcb)
+  - [`flush_cb` notes](#flushcb-notes)
+  - [`rounder_cb` Description](#roundercb-description)
+  - [How the callbacks tie back to the overlay](#how-the-callbacks-tie-back-to-the-overlay)
+  - [Basic Hello World `main.c`](#basic-hello-world-mainc)
+- [Building Application and Flashing Board](#building-application-and-flashing-board)
+
+---
+
+
 ## Target Stack
 
-- Development Board: nRF52840DK (compatible with other nordic dev boards with changes to pin assingments)
+- Development Board: nRF52840DK (compatible with other nordic dev boards with changes to pin assignments)
 - Toolchain: Zephyr/NCS v3.0.2 + LVGL v9
-- Epaper display: Adafruit 2.13" ePaper Display https://www.adafruit.com/product/4197
+- e-paper display: Adafruit 2.13" ePaper Display https://www.adafruit.com/product/4197
 
 ## Overview
 This tutorial walks through connecting a ssd1680 ePaper device to a nordic NRF dev board
@@ -13,7 +45,7 @@ This tutorial walks through connecting a ssd1680 ePaper device to a nordic NRF d
 
 - A minimal LVGL v9 app in 1-bit mode
 - A custom flush callback that converts LVGL's horizontal 1-bpp data into the SSD16xx vertical-tiled format
-- A rounder callback so LVGL only draws byte-allinged areas
+- A rounder callback so LVGL only draws byte-aligned areas
 - A label and a logo bitmap, with examples of partial and full refresh cycles
 
 ## Hardware & wiring
@@ -118,8 +150,7 @@ In addition, we define border waveforms for full and partial refreshes. Full ref
         };
 ```
 
-### Key Zepher Files for ssd16xx Displays
-
+### Key Zephyr Files for SSD16xx Displays
 More information on the SSD16xx family can be found in two places in NCS v3.0.2:
 
 1. Driver source code -> located in
@@ -365,7 +396,7 @@ epd: ssd16xxfb@0 {
 };
 ```
 
-At boot, Zephyr binds the `ssd16xxfb` driver to the `epd` node and exposes it as a `struct device` this is usefull since we can abtract away the device driver implmentation from our source code alowing us to simply modify our overlay if we are using a diffrent Epaper without having to modify our `main.c`
+At boot, Zephyr binds the `ssd16xxfb` driver to the `epd` node and exposes it as a `struct device` this is usefull since we can abtract away the device driver implmentation from our source code allowing us to simply modify our overlay if we are using a different e-paper without having to modify our `main.c`
 
 In `main.c` we get the device struct with:
 
@@ -377,7 +408,7 @@ This returns an instance of the driver containing our configurations defined in 
 
 2. From Zephyr device to LVGL display object
 
-We create a display which requieres our display's resolution, colour format, and buffer infromation
+We create a display which requires our display's resolution, color format, and buffer information
 
 ```c
 lv_display_t *disp = lv_display_create(PANEL_HOR_RES, PANEL_VER_RES);
@@ -385,13 +416,13 @@ lv_display_set_color_format(disp, LV_COLOR_FORMAT_I1);
 lv_display_set_buffers(disp, draw_buf, NULL, sizeof(draw_buf),
                        LV_DISPLAY_RENDER_MODE_FULL);
 ```
-The Zephyr device pointer ins placed inside the LVGL display object so the flush callback can reach it
+The Zephyr device pointer is placed inside the LVGL display object so the flush callback can reach it
 
 ```c
 lv_display_set_user_data(disp, (void *)display_dev);
 ```
 
-So now we can assingn the display to our flush and event callbacks
+So now we can assign the display to our flush and event callbacks
 
 ```c
 lv_display_set_flush_cb(disp, epd_flush_cb);
@@ -405,7 +436,7 @@ Purpose: This function takes the rectangle of pixels LVGL renders into `draw_buf
 
 **Key Points**
 
-- We configured LVGL to render 1-bit pixes using `LV_COLOUR_FORMAT_I1`. These pixels are horizontally packed, MSB-first, with a full-width stride of of `PANEL_HOR_RES` (256)
+- We configured LVGL to render 1-bit pixes using `LV_COLOR_FORMAT_I1`. These pixels are horizontally packed, MSB-first, with a full-width stride of of `PANEL_HOR_RES` (256)
 - The SSD16xx controllers store RAM in vertical tiles (`SCREEN_INFO_MONO_VTILTED`), meaning each byte = 8 vertical pixels (MSB is top)
 - The physical glass is 250x122, but 256x128 are exposed to LVGL for byte alingment, so we must clip to 250x122 when sending
 
@@ -489,15 +520,15 @@ static void epd_flush_cb(lv_display_t *disp, const lv_area_t *area,
 
 ### `flush_cb` notes
 
-- Palett skip (8 bytes): LVGL reserves a small header for I1; if it is not skiped, your top row get corrupted
-- Clipping: Prevents accidental writes beyond 250x122 (physical pannel size) even though LVGL belices 256x128 exits
+- Palette skip (8 bytes): LVGL reserves a small header for I1; if it is not skipped, your top row get corrupted
+- Clipping: Prevents accidental writes beyond 250x122 (physical panel size) even though LVGL believes 256x128 exits
 - Vertical-tiling convert: Matches the controller’s memory format; without this, content appears scrambled or interleaved.
 - Descriptor `width/pitch/height`: Must correspond to the converted buffer layout; for VTILED displays, `height` is rounded up to a multiple of 8
 - For partial refresh: LVGL passes only the area that changed
 
 ### `rounder_cb` Description
 
-This function Makes LVGL's invalidate/flush rectangels line up with the hardware's memory granularity so the 1-bit VTILED assumptions hold and we prevent "bit smearing"
+This function Makes LVGL's invalidate/flush rectangles line up with the hardware's memory granularity so the 1-bit VTILED assumptions hold and we prevent "bit smearing"
 
 ```c
 
@@ -514,11 +545,11 @@ static void rounder_cb(lv_event_t *e)
 ```
 
 This ensures the following
-- Horizontal byte alingment: Since LVGL's source buffer `px_map` is horizontal 1bpp (8 pixels per byte), forcing `x1` to a miltiple of 8 and `x2` to somewhere between 0 and 7 ensures the region you read from is composed of full bytes. This:
+- Horizontal byte alingment: Since LVGL's source buffer `px_map` is horizontal 1bpp (8 pixels per byte), forcing `x1` to a multiple of 8 and `x2` to somewhere between 0 and 7 ensures the region you read from is composed of full bytes. This:
 -- Simplifies bit extraction
 --Avoids reading partial bytes at the edges
--- Prevents corruption when LVGL asks to flush a narrow, odd-aligned rectangel
-- Vertiacl alingment: handeld in `flush_cb`
+-- Prevents corruption when LVGL asks to flush a narrow, odd-aligned rectangle
+- Vertical alingment: handled in `flush_cb`
 
 ### How the callbacks tie back to the overlay
 1. Overlay sets bus/pins/waveforms and names the display via `label = "epd"`; `chosen { zephyr,display = &epd; } makes it the default
@@ -527,7 +558,7 @@ This ensures the following
 - This creates an LVGL display `(lv_display_create(...))` with logical `256x128` and `I1` format
 - Stashes `display_dev` as user_data on the LVGL display
 - Registers `rounder_cb` to align LVGLs rectangles and `epd_flush_cb` to do the conversion and call `display_write()` with the proper buffer descriptor
-- The SSD16xx driver chooses partial/full waveforms (defined in the overlay) depending on the region and updarte, and toggles the `busy` pin appropriatly
+- The SSD16xx driver chooses partial/full waveforms (defined in the overlay) depending on the region and update, and toggles the `busy` pin appropriately
 
 ### Basic Hello World `main.c`
 
@@ -611,7 +642,6 @@ After the build completes you can flash the board by selecting **Flash** under t
 The display will show "Hello from LVGL!" if the programming was sucsessful.
 
 ![Hello](./images/Hello.png)
-
 
 
 
