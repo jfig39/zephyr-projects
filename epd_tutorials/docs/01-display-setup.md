@@ -644,4 +644,89 @@ The display will show "Hello from LVGL!" if the programming was sucsessful.
 ![Hello](./images/Hello.png)
 
 
+## Adding Images to the Project
 
+In order do add a images to the display we first need to convert our image into a bitmap. LVLG has a python script avalible that will generate a c file to store the image data: https://github.com/lvgl/lvgl/blob/master/scripts/LVGLImage.py
+
+The script relies on pypng package which we can donload using
+```cmd
+py -3 -m pip install pypng lz4
+```
+
+With our resized image in the same folder as the python scipt we can run the Image converter with the following arguments.
+
+```cmd
+py -3 .\LVGLImage.py `
+  --ofmt C `
+  --cf I1 `
+  --output .\out `
+  --name Battery_Resized `
+  .\Battery_Resized.png
+
+```
+
+For this example I am using a battery symbol
+
+![Unformatteed_Battery](./images/Battery.png)
+
+The script will place your image in an `out` folder in the same directory you ran the scrip. Place it inside your `/src` folder
+
+More information on images can be found in the LVGL documation in: https://docs.lvgl.io/master/details/main-modules/image.html
+
+## Adding the Image to `main.c`
+
+To add our Image to our `main.c` we need to include the c file into our project with the rest of our includes.
+
+**Note:** In order to get my project to build I needed to change the #include on line 9 of Battery_Resized.h from "lvgl/lvgl.h" to "lvgl.h"
+
+```c
+#include Battery_Resized.c
+```
+
+This snippet demonstrates how to bring up the e-paper display, show a text label, 
+force a refresh, wait a few seconds, and then replace it with an image.  
+It uses the **LVGL graphics library** integrated with Zephyr RTOS.
+
+```c
+display_blanking_off(display_dev);
+
+```
+
+- Turns off panel blanking so the e-paper display can start showing content.
+- Required before drawing anything on the screen.
+
+```c
+/* Simple demo UI */
+lv_obj_t *label = lv_label_create(lv_screen_active());
+lv_label_set_text(label, "Hello from LVGL!");
+lv_obj_center(label);
+```
+
+- Creates a label widget on the active LVGL screen.
+- Sets the label text to "Hello from LVGL!".
+- Centers the label on the display.
+
+```c
+/* Force redraw the invalidated areas */
+lv_refr_now(lv_disp_get_default());
+```
+- Immediately triggers LVGL to flush any pending draw operations to the display.
+- Useful on e-paper since you want deterministic, synchronous updates.
+
+```c
+k_sleep(K_SECONDS(5));
+```
+
+- Pauses execution for 5 seconds so the text remains visible
+
+```c
+extern const lv_image_dsc_t Battery_Resized;
+lv_obj_t *img = lv_image_create(lv_screen_active());
+lv_image_set_src(img, &Battery_Resized);
+lv_obj_center(img);
+```
+
+- References an external image descriptor (Battery_Resized) that was converted using the LVGL image converter.
+- Creates an LVGL image widget on the active screen.
+- Sets the image source to the Battery_Resized asset.
+- Centers the image on the display, replacing the label.

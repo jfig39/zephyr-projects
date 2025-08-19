@@ -7,6 +7,7 @@
 #include <lvgl.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "Battery_Resized.c" // LVGL image asset
 
 /* Logical canvas for LVGL (byte-aligned). The SSD1680’s physical area is
  * 250x122, so we clip to that inside the flush. */
@@ -18,7 +19,7 @@
 static uint8_t draw_buf[DRAW_BUF_SIZE];
 
 static void epd_flush_cb(lv_display_t *disp, const lv_area_t *area,
-                        uint8_t *px_map)
+                         uint8_t *px_map)
 {
     const struct device *dev = (const struct device *)lv_display_get_user_data(disp);
     /* Skip the 8‑byte palette */
@@ -29,10 +30,12 @@ static void epd_flush_cb(lv_display_t *disp, const lv_area_t *area,
     lv_coord_t y1 = area->y1;
     lv_coord_t x2 = area->x2;
     lv_coord_t y2 = area->y2;
-    if (x2 >= 250) {
+    if (x2 >= 250)
+    {
         x2 = 249;
     }
-    if (y2 >= 122) {
+    if (y2 >= 122)
+    {
         y2 = 121;
     }
     uint16_t w = (uint16_t)(x2 - x1 + 1);
@@ -44,13 +47,17 @@ static void epd_flush_cb(lv_display_t *disp, const lv_area_t *area,
      */
     static uint8_t vtbuf[PANEL_HOR_RES * ((PANEL_VER_RES + 7) / 8)];
     uint16_t groups = (h + 7U) >> 3; /* number of 8‑row groups */
-    for (uint16_t gx = 0; gx < w; gx++) {
-        for (uint16_t gy = 0; gy < groups; gy++) {
+    for (uint16_t gx = 0; gx < w; gx++)
+    {
+        for (uint16_t gy = 0; gy < groups; gy++)
+        {
             uint8_t out_byte = 0;
-            for (uint8_t bit = 0; bit < 8; bit++) {
+            for (uint8_t bit = 0; bit < 8; bit++)
+            {
                 uint16_t row = gy * 8U + bit;
                 uint8_t bit_val = 0;
-                if (row < h) {
+                if (row < h)
+                {
                     /* Compute global coordinates */
                     lv_coord_t px = x1 + gx;
                     lv_coord_t py = y1 + row;
@@ -62,7 +69,8 @@ static void epd_flush_cb(lv_display_t *disp, const lv_area_t *area,
                     bit_val = (px_map[byte_index] >> (7 - bit_offset)) & 0x1U;
                 }
                 /* For MSB‑first displays, set bits from MSB to LSB */
-                if (bit_val) {
+                if (bit_val)
+                {
                     out_byte |= (1U << (7 - bit));
                 }
             }
@@ -76,15 +84,16 @@ static void epd_flush_cb(lv_display_t *disp, const lv_area_t *area,
      * Buffer size is w × groups bytes. */
     struct display_buffer_descriptor desc = {
         .buf_size = w * groups,
-        .width    = w,
-        .pitch    = w,
+        .width = w,
+        .pitch = w,
         /* The SSD16xx driver requires the height to be a multiple of 8
          * when the screen is vertically tiled.  Use groups*8 rather than
          * the clipped height to satisfy this constraint. */
-        .height   = (uint16_t)(groups * 8U),
+        .height = (uint16_t)(groups * 8U),
     };
     int ret = display_write(dev, x1, y1, &desc, vtbuf);
-    if (ret) {
+    if (ret)
+    {
         printk("display_write() failed: %d\n", ret);
     }
     lv_display_flush_ready(disp);
@@ -98,17 +107,18 @@ static void rounder_cb(lv_event_t *e)
     lv_area_t *a = (lv_area_t *)lv_event_get_param(e);
     a->x1 = (a->x1 & ~0x7);
     a->x2 = (a->x2 | 0x7);
-    if (a->x2 >= PANEL_HOR_RES) {
+    if (a->x2 >= PANEL_HOR_RES)
+    {
         a->x2 = PANEL_HOR_RES - 1;
     }
 }
-
 
 int main(void)
 {
     /* Bind the chosen display from Devicetree (your overlay points to ssd16xx). */
     const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
-    if (!device_is_ready(display_dev)) {
+    if (!device_is_ready(display_dev))
+    {
         printk("Display device not ready\n");
         return 0;
     }
@@ -121,14 +131,20 @@ int main(void)
            cap.supported_pixel_formats, cap.x_resolution, cap.y_resolution);
 
     int err = 0;
-    if (cap.supported_pixel_formats & PIXEL_FORMAT_MONO01) {
+    if (cap.supported_pixel_formats & PIXEL_FORMAT_MONO01)
+    {
         err = display_set_pixel_format(display_dev, PIXEL_FORMAT_MONO01);
-    } else if (cap.supported_pixel_formats & PIXEL_FORMAT_MONO10) {
+    }
+    else if (cap.supported_pixel_formats & PIXEL_FORMAT_MONO10)
+    {
         err = display_set_pixel_format(display_dev, PIXEL_FORMAT_MONO10);
-    } else {
+    }
+    else
+    {
         printk("No supported MONO pixel format\n");
     }
-    if (err) {
+    if (err)
+    {
         printk("display_set_pixel_format failed: %d\n", err);
     }
 
@@ -136,7 +152,8 @@ int main(void)
     lv_init();
 
     lv_display_t *disp = lv_display_create(PANEL_HOR_RES, PANEL_VER_RES);
-    if (!disp) {
+    if (!disp)
+    {
         printk("lv_display_create failed\n");
         return 0;
     }
@@ -152,16 +169,25 @@ int main(void)
     lv_display_set_flush_cb(disp, epd_flush_cb);
     lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
 
+    display_blanking_off(display_dev);
+
     /* Simple demo UI */
     lv_obj_t *label = lv_label_create(lv_screen_active());
     lv_label_set_text(label, "Hello from LVGL!");
     lv_obj_center(label);
 
-    /* Power up the panel */
-    display_blanking_off(display_dev);
+    /* Force redraw the invalidated areas */
+       lv_refr_now(lv_disp_get_default());
+
+    k_sleep(K_SECONDS(5));
+    extern const lv_image_dsc_t Battery_Resized;
+    lv_obj_t *img = lv_image_create(lv_screen_active());
+    lv_image_set_src(img, &Battery_Resized);
+    lv_obj_center(img);
 
     /* LVGL tick/handler loop */
-    while (true) {
+    while (true)
+    {
         lv_timer_handler();
         k_msleep(50);
     }
