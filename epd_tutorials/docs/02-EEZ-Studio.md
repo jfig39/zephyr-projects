@@ -1,6 +1,19 @@
 # EEZ Studo/Epaper Tutorial
 
-This tutorial will cover using EEZ Studio to generate a UI that we can export into our project. We will add learn how to add EEZ Studio files to our project, and add a label to display lux sensor data from a bh1750.
+This tutorial will cover using EEZ Studio to generate a UI that we can export into our project. We will learn how to add EEZ Studio files to our project and create a label to display lux sensor data from a BH1750 sensor.
+
+## Table of Contents
+
+- [EEZ Studo/Epaper Tutorial](#eez-studoepaper-tutorial)
+  - [Table of Contents](#table-of-contents)
+  - [Prequisites](#prequisites)
+    - [Note on Finding Sensor/I2C Info](#note-on-finding-sensori2c-info)
+  - [Creating a Basic UI in EEZ Studio](#creating-a-basic-ui-in-eez-studio)
+    - [Create a New Project](#create-a-new-project)
+  - [Add EEZ to Project](#add-eez-to-project)
+  - [Updating Label With Sensor Data](#updating-label-with-sensor-data)
+  - [Full main.c](#full-mainc)
+
 
 ## Prequisites
 - The starting point for this project is the `epd_hello_world` example found at `zephyr-projects/epd_tutorials/epd_hello_world`
@@ -9,11 +22,11 @@ This tutorial will cover using EEZ Studio to generate a UI that we can export in
 
 ### Note on Finding Sensor/I2C Info
 
-If you need to find information such as the compatable tag and sensor functions you can look up the bindings file for the specifc sensor which is contained in `zephyr/dts/bindings/sensor`. The default I2C pins can be found in `zephyr/boards/<board mfg>/<board.dtsi>`
+If you need to find information such as the compatible alias and sensor functions, you can look up the bindings file for the specific sensor under `zephyr/dts/bindings/sensor`. The default I²C pins can be found in `zephyr/boards/<board manufacturer>/<board>.dtsi`.
 
-Here is the additional test code I used to test the sensor. 
+Here is the additional test code I used to validate the sensor on its own.
 
-I added the I2C and sensor config symbols to the prj.conf
+I added the I²C and sensor configuration symbols to the `prj.conf` file:
 
 ```.conf
 # ─────────────────────────────
@@ -176,32 +189,32 @@ After building and flashing the serial output should look like this
 
 ![Lux sensor output](./images/Lux_sensor_output.png)
 
-Next we will incorperate the Lux sensor output into our existing main code by creating a label to contain the lux sensor data and update it every minute. 
+Next we will incorporate the BH1750 lux sensor output into our existing `main.c` by creating a label to display the measured value. We’ll update this label every 30 seconds (to match the sensor polling period).
 
 ## Creating a Basic UI in EEZ Studio
 
 ### Create a New Project
 
-Once EEZ studio is installed, open it and create a new LVGL project, name the project `LVGLdemo`, selsect version `9.x` and set the project directory.
+Once EEZ studio is installed, open it and create a new LVGL project, name the project `LVGLdemo`, select version `9.x` and set the project directory.
 
 ![EEZ_create](./images/EEZ_create.png)
 
-We fist need to set the size of our display, on the right hand side of the eidtor under the `Main` page section we can set the width to 250 and height to 122 to match our Epaper's resolution.
+We fist need to set the size of our display, on the right hand side of the editor under the `Main` page section we can set the width to 250 and height to 122 to match our Epaper's resolution.
 
 ![EEZ_set_dim](./images/EEZ_set_dim.png)
 
-The previw window will resize to match the resolution of our screen.
+The preview window will resize to match the resolution of our screen.
 
 For an inital test we will create two labels, one as a title and one to display our lux values. Under the Style window you can select the LVGL widgets you want to add to the project, select the Label widget and drag it to the top middle of your display canvas, add Another labble in the center. 
 
 
 ![EEZ_add_labels](./images/EEZ_add_labels.png)
 
-We can edit the text and name of the label from the propreties pannel. We name the first label `Hello World` and specify the text to be `EEZ Studio GUI`. The second label will be nammed `LuxValueLabel` and the text will be initalized as `— lx`
+We can edit the text and name of the label from the propreties pannel. We name the first label `Hello World` and specify the text to be `EEZ Studio GUI`. The second label will be named `LuxValueLabel` and the text will be initalized as `— lx`
 
 ![EEZ_edit_labels](./images/Edit_Labels.png)
 
-To verify that there are no issues with our UI we click the checkmark on the top tool bar, if there are no issues we can select the wrench to build the project. The build will create a `scr/ui` folder (location specifed in project creation) that contains the nessicary files to be imported into our project.
+To verify that there are no issues with our UI we click the checkmark on the top tool bar, if there are no issues we can select the wrench to build the project. The build will create a `scr/ui` folder (location specifed in project creation) that contains the necessary files to be imported into our project.
 
 ![EEZ_verify_build](./images/EEZ_verify_build.png)
 
