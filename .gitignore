@@ -40,3 +40,4 @@ __pycache__/
 *.hex
 *.map
 *.Zone.Identifier*.Zone.Identifier
+*.Zone.Identifier
