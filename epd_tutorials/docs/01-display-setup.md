@@ -216,9 +216,6 @@ The following section enables spi1 for use with our e-paper display and configur
         zephyr,display = &epd;
     };
 
-    aliases {
-        light0 = &lux_sensor;
-    };
 
     mipi_dbi_epd: mipi_dbi_epd {
         compatible = "zephyr,mipi-dbi-spi";
@@ -286,87 +283,42 @@ The `prj.conf` file defines the Kconfig options used when building this project.
 
 **Compatibility note:** Some configuration options available in newer versions of Zephyr’s LVGL are not present in NCS v3.0.2. The settings shown here are the ones that worked for me while developing on NCS v3.0.2.
 
-### `prj.conf` Configuration Summary
-
-| **Config Option(s)**                                                                                                                                               | **Purpose**                                                                                                                 |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `CONFIG_SPI`, `CONFIG_SPI_NRFX`, `CONFIG_GPIO`                                                                                                                     | Enables core SPI and GPIO drivers. `CONFIG_SPI_NRFX` uses the Nordic-specific SPI implementation for performance.           |
-| `CONFIG_DISPLAY`, `CONFIG_SSD16XX`                                                                                                                                 | Activates Zephyr’s display subsystem and the SSD16xx framebuffer driver for the SSD1680 controller.                         |
-| `CONFIG_LVGL`                                                                                                                                                      | Enables the LVGL graphics library.                                                                                          |
-| `CONFIG_LV_Z_AUTO_INIT=n`                                                                                                                                          | Disables LVGL’s automatic initialization so the display can be registered manually, avoiding race conditions in NCS v3.0.2. |
-| `CONFIG_LV_Z_USE_DISPLAY`                                                                                                                                          | Keeps Zephyr’s LVGL display glue layer for tick helpers and color/BPP handling.                                             |
-| `CONFIG_LV_Z_BITS_PER_PIXEL=1`                                                                                                                                     | Uses 1-bit-per-pixel mode for monochrome e-paper, minimizing memory use and transfer size.                                  |
-| `CONFIG_LV_Z_MEM_POOL_SIZE=24576`                                                                                                                                  | Allocates memory for LVGL’s internal draw buffers and objects.                                                              |
-| `CONFIG_LV_USE_LABEL`, `CONFIG_LV_LABEL_TEXT_SELECTION`, `CONFIG_LV_LABEL_LONG_TXT_HINT`, `CONFIG_LV_USE_LINE`, `CONFIG_LV_USE_THEME_DEFAULT`, `CONFIG_LV_USE_IMG` | Enables specific LVGL widgets and features needed for the UI.                                                               |
-| `CONFIG_LOG`, `CONFIG_LV_USE_LOG`, `CONFIG_LV_LOG_LEVEL_INFO`, `CONFIG_DISPLAY_LOG_LEVEL_DBG`                                                                      | Enables logging for Zephyr, LVGL, and the display driver to help with debugging.                                            |
-| `CONFIG_ASSERT`, `CONFIG_HW_STACK_PROTECTION`                                                                                                                      | Improves system robustness by catching programming errors and stack overflows early.                                        |
-| `CONFIG_MAIN_STACK_SIZE=8192`, `CONFIG_SYSTEM_WORKQUEUE_STACK_SIZE=3072`                                                                                           | Allocates stack memory for the main thread and system workqueue.                                                            |
-| `CONFIG_NEWLIB_LIBC`, `CONFIG_NEWLIB_LIBC_NANO`, `CONFIG_NEWLIB_LIBC_FLOAT_PRINTF`                                                                                 | Uses the newlib C library (nano variant) with floating-point `printf` support.                                              |
-| `CONFIG_CBPRINTF_FP_SUPPORT`                                                                                                                                       | Enables floating-point formatting for `cbprintf` and related functions.                                                     |
 
 ### Full `prj.conf` file
 
 ```.conf
-# ─────────────────────────────
-# Low-level peripheral support
-# ─────────────────────────────
+# ── Low-level IO
+CONFIG_GPIO=y
 CONFIG_SPI=y
 CONFIG_SPI_NRFX=y
-CONFIG_GPIO=y
 
-# ─────────────────────────────
-# Display driver
-# ─────────────────────────────
+# ── Display
 CONFIG_DISPLAY=y
-CONFIG_SSD16XX=y                
+CONFIG_SSD16XX=y
 
-# ─────────────────────────────
-# LVGL (manual init; you call lv_init / register display yourself)
-# ─────────────────────────────
+# ── LVGL (manual init)
 CONFIG_LVGL=y
 CONFIG_LV_Z_AUTO_INIT=n
-CONFIG_LV_Z_USE_DISPLAY=y       
-CONFIG_LV_Z_BITS_PER_PIXEL=1    
-CONFIG_LV_Z_MEM_POOL_SIZE=24576   
-
-# ─────────────────────────────
-# LVGL widgets / features (enable what you actually use)
-# ─────────────────────────────
+CONFIG_LV_Z_BITS_PER_PIXEL=1
+CONFIG_LV_Z_MEM_POOL_SIZE=24576
 CONFIG_LV_USE_LABEL=y
-CONFIG_LV_LABEL_TEXT_SELECTION=y
-CONFIG_LV_LABEL_LONG_TXT_HINT=y
-CONFIG_LV_USE_LINE=y
 CONFIG_LV_USE_THEME_DEFAULT=y
-CONFIG_LV_USE_IMG=y
 
-# ─────────────────────────────
-# Logging
-# ─────────────────────────────
+# ── Logging (handy while bring-up)
 CONFIG_LOG=y
-CONFIG_LOG_DEFAULT_LEVEL=3
-CONFIG_DISPLAY_LOG_LEVEL_DBG=y
 CONFIG_LV_USE_LOG=y
 CONFIG_LV_LOG_LEVEL_INFO=y
+CONFIG_DISPLAY_LOG_LEVEL_DBG=y
 
-# ─────────────────────────────
-# Robustness / debug
-# ─────────────────────────────
-CONFIG_ASSERT=y
-CONFIG_HW_STACK_PROTECTION=y
-
-# ─────────────────────────────
-# Memory / stacks
-# ─────────────────────────────
-CONFIG_MAIN_STACK_SIZE=8192
-CONFIG_SYSTEM_WORKQUEUE_STACK_SIZE=3072
-
-# ─────────────────────────────
-# C library / printf
-# ─────────────────────────────
+# ── libc + float printf (we’ll still format as integers for safety)
 CONFIG_NEWLIB_LIBC=y
 CONFIG_NEWLIB_LIBC_NANO=y
 CONFIG_NEWLIB_LIBC_FLOAT_PRINTF=y
 CONFIG_CBPRINTF_FP_SUPPORT=y
+
+# ── Stacks / safety
+CONFIG_HW_STACK_PROTECTION=y
+CONFIG_MAIN_STACK_SIZE=24576
 
 ```
 
@@ -555,69 +507,233 @@ This ensures the following
 ### Basic Hello World `main.c`
 
 ```c
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/display.h>
+#include <zephyr/sys/printk.h>
+#include <lvgl.h>
+
+/* Logical LVGL resolution (must be multiple of 8 for I1) */
+#define PANEL_HOR_RES 256U
+#define PANEL_VER_RES 128U
+
+/* LVGL draw buffer: +8 bytes palette for I1 */
+#define DRAW_BUF_SIZE (((PANEL_HOR_RES * PANEL_VER_RES) / 8U) + 8U)
+static uint8_t draw_buf[DRAW_BUF_SIZE];
+
+/* ------- EPD flush: LVGL I1 -> SSD16xx vertical-tiling ------- */
+static void epd_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
+{
+        const struct device *dev = (const struct device *)lv_display_get_user_data(disp);
+
+        /* Skip 8-byte palette for I1 */
+        px_map += 8;
+
+        /* Clip to physical (250x122) */
+        lv_coord_t x1 = area->x1, y1 = area->y1, x2 = area->x2, y2 = area->y2;
+        if (x2 >= 250)
+                x2 = 249;
+        if (y2 >= 122)
+                y2 = 121;
+        uint16_t w = (uint16_t)(x2 - x1 + 1);
+        uint16_t h = (uint16_t)(y2 - y1 + 1);
+
+        /* Convert to vertical-tiling */
+        static uint8_t vtbuf[PANEL_HOR_RES * ((PANEL_VER_RES + 7) / 8)];
+        uint16_t groups = (h + 7U) >> 3;
+
+        for (uint16_t gx = 0; gx < w; gx++)
+        {
+                for (uint16_t gy = 0; gy < groups; gy++)
+                {
+                        uint8_t out_byte = 0;
+                        for (uint8_t bit = 0; bit < 8; bit++)
+                        {
+                                uint16_t row = gy * 8U + bit;
+                                uint8_t bit_val = 0;
+                                if (row < h)
+                                {
+                                        lv_coord_t px = x1 + gx;
+                                        lv_coord_t py = y1 + row;
+                                        uint32_t idx = (uint32_t)py * PANEL_HOR_RES + px;
+                                        uint32_t byte_index = idx >> 3;
+                                        uint8_t bit_off = idx & 0x7;
+                                        bit_val = (px_map[byte_index] >> (7 - bit_off)) & 1U;
+                                }
+                                if (bit_val)
+                                        out_byte |= (1U << (7 - bit));
+                        }
+                        vtbuf[gy * w + gx] = out_byte;
+                }
+        }
+
+        struct display_buffer_descriptor desc = {
+            .buf_size = w * groups,
+            .width = w,
+            .pitch = w,
+            .height = (uint16_t)(groups * 8U),
+        };
+
+        int ret = display_write(dev, x1, y1, &desc, vtbuf);
+        if (ret)
+        {
+                printk("display_write() failed: %d\n", ret);
+        }
+
+        lv_display_flush_ready(disp);
+}
+
+/* Align flush areas to 8px boundaries (I1 byte alignment) */
+static void rounder_cb(lv_event_t *e)
+{
+        lv_area_t *a = (lv_area_t *)lv_event_get_param(e);
+        a->x1 &= ~0x7;
+        a->x2 |= 0x7;
+        if (a->x2 >= PANEL_HOR_RES)
+                a->x2 = PANEL_HOR_RES - 1;
+        /* y alignment not required for I1; keep as-is to minimize area */
+}
+
+/* LVGL tick from Zephyr uptime (ms) */
+static uint32_t my_tick_get(void) { return (uint32_t)k_uptime_get(); }
+
 int main(void)
 {
-    /* Bind the chosen display from Devicetree (your overlay points to ssd16xx). */
-    const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
-    if (!device_is_ready(display_dev)) {
-        printk("Display device not ready\n");
+        const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
+        if (!device_is_ready(display_dev))
+        {
+                printk("Display device not ready\n");
+                return;
+        }
+
+        /* LVGL init */
+        lv_init();
+        lv_tick_set_cb(my_tick_get);
+
+        /* LVGL display setup: PARTIAL render mode so only invalidated areas flush */
+        lv_display_t *disp = lv_display_create(PANEL_HOR_RES, PANEL_VER_RES);
+        if (!disp)
+        {
+                printk("Failed to create LVGL display\n");
+                return;
+        }
+        lv_display_set_color_format(disp, LV_COLOR_FORMAT_I1);
+        lv_display_set_user_data(disp, (void *)display_dev);
+        lv_display_set_buffers(disp, draw_buf, NULL, sizeof(draw_buf),
+                               LV_DISPLAY_RENDER_MODE_PARTIAL); /* <-- key */
+
+        lv_display_set_flush_cb(disp, epd_flush_cb);
+        lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, disp);
+
+        display_blanking_off(display_dev);
+
+        /* Simple demo UI */
+        lv_obj_t *label = lv_label_create(lv_screen_active());
+        lv_label_set_text(label, "Hello from LVGL!");
+        lv_obj_center(label);
+
+        /* LVGL tick/handler loop */
+        while (true)
+        {
+                lv_timer_handler();
+                k_msleep(50);
+        }
         return 0;
-    }
-    printk("Display device: %p\n", display_dev);
-
-    /* Pick a supported monochrome pixel format. */
-    struct display_capabilities cap;
-    display_get_capabilities(display_dev, &cap);
-    printk("Display caps: formats=0x%x, x_res=%u y_res=%u\n",
-           cap.supported_pixel_formats, cap.x_resolution, cap.y_resolution);
-
-    int err = 0;
-    if (cap.supported_pixel_formats & PIXEL_FORMAT_MONO01) {
-        err = display_set_pixel_format(display_dev, PIXEL_FORMAT_MONO01);
-    } else if (cap.supported_pixel_formats & PIXEL_FORMAT_MONO10) {
-        err = display_set_pixel_format(display_dev, PIXEL_FORMAT_MONO10);
-    } else {
-        printk("No supported MONO pixel format\n");
-    }
-    if (err) {
-        printk("display_set_pixel_format failed: %d\n", err);
-    }
-
-    /* LVGL init + display setup */
-    lv_init();
-
-    lv_display_t *disp = lv_display_create(PANEL_HOR_RES, PANEL_VER_RES);
-    if (!disp) {
-        printk("lv_display_create failed\n");
-        return 0;
-    }
-
-    lv_display_set_color_format(disp, LV_COLOR_FORMAT_I1);
-    lv_display_set_user_data(disp, (void *)display_dev);
-
-    /* Single full-screen I1 buffer; LVGL will flush sub-areas. */
-    lv_display_set_buffers(disp, draw_buf, NULL, sizeof(draw_buf),
-                           LV_DISPLAY_RENDER_MODE_FULL);
-
-    /* Register flush + rounder (rounder via v9 event). */
-    lv_display_set_flush_cb(disp, epd_flush_cb);
-    lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
-
-    /* Simple demo UI */
-    lv_obj_t *label = lv_label_create(lv_screen_active());
-    lv_label_set_text(label, "Hello from LVGL!");
-    lv_obj_center(label);
-
-    /* Power up the panel */
-    display_blanking_off(display_dev);
-
-    /* LVGL tick/handler loop */
-    while (true) {
-        lv_timer_handler();
-        k_msleep(50);
-    }
 }
+
 ```
+
+### Notes on `main.c`
+
+Attemting to auto initalize lvlg caused my application to crash which is why I chose to manually initalize LVLG. The process of including lvlg into the application can be found in their documentation here:https://docs.lvgl.io/master/details/integration/adding-lvgl-to-your-project/connecting_lvgl.html
+
+![data flowchart from lvgl documentation](./images/intro_data_flow.png)
+
+
+### Initaliztion steps
+
+1. **Initialize LVGL**
+
+Call `lv_init()` once at the very beginning of your application. This sets up LVGL’s core structures. No other LVGL calls are valid until this runs.
+
+2. **Initialize the display driver**
+
+Retrieve the display device from the devicetree and verify it is ready.
+
+```c
+ const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
+        if (!device_is_ready(display_dev))
+        {
+                printk("Display device not ready\n");
+                return;
+        }
+```
+
+3. **Provide a system tick to LVGL**
+
+LVGL requires a millisecond time base for its internal timers and animations.
+Define a tick function using Zephyr’s uptime counter:
+
+```c
+static uint32_t my_tick_get(void) { return (uint32_t)k_uptime_get(); }
+```
+
+Which we link to LVLG using
+
+```c
+lv_tick_set_cb(my_tick_get);
+```
+
+4. **Register the display interface**
+
+Create an LVGL display object, set its format and buffers, and register callbacks for flushing and alignment.
+
+```c
+/* LVGL display setup: PARTIAL render mode so only invalidated areas flush */
+        lv_display_t *disp = lv_display_create(PANEL_HOR_RES, PANEL_VER_RES);
+        if (!disp)
+        {
+                printk("Failed to create LVGL display\n");
+                return;
+        }
+        lv_display_set_color_format(disp, LV_COLOR_FORMAT_I1);
+        lv_display_set_user_data(disp, (void *)display_dev);
+        lv_display_set_buffers(disp, draw_buf, NULL, sizeof(draw_buf),
+                               LV_DISPLAY_RENDER_MODE_PARTIAL); /* <-- key */
+
+        lv_display_set_flush_cb(disp, epd_flush_cb);
+        lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, disp);
+
+        display_blanking_off(display_dev);
+```
+5. **Skip input devices**
+
+Since the e-paper panel has no touch input, we omit this step.
+
+6. **DRun the LVGL task handler loop**
+
+LVGL needs to periodically process timers and events. Call `lv_timer_handler()` every few milliseconds in your main loop:
+
+```c
+    while (true)
+        {
+                lv_timer_handler();
+                k_msleep(50);
+        }
+```
+7. **Create UI objects**
+Once initialized, you can create LVGL objects such as labels, buttons, or images:
+
+```c
+        /* Simple demo UI */
+        lv_obj_t *label = lv_label_create(lv_screen_active());
+        lv_label_set_text(label, "Hello from LVGL!");
+        lv_obj_center(label);
+```
+
+The full project up to this point can be found here:`epd_tutorials/epd_hello_world`
+
 
 ## Building Application and Flashing Board
 
@@ -638,7 +754,7 @@ The display will show "Hello from LVGL!" if the programming was sucsessful.
 
 ## Adding Images to the Project
 
-In order do add a images to the display we first need to convert our image into a bitmap. LVLG has a python script avalible that will generate a c file to store the image data: https://github.com/lvgl/lvgl/blob/master/scripts/LVGLImage.py
+In order to add a images to the display we first need to convert our image into a bitmap. LVLG has a python script avalible that will generate a c file to store the image data: https://github.com/lvgl/lvgl/blob/master/scripts/LVGLImage.py
 
 The script relies on pypng package which we can donload using
 ```cmd
@@ -675,41 +791,23 @@ To add our Image to our `main.c` we need to include the c file into our project 
 #include Battery_Resized.c
 ```
 
-This snippet demonstrates how to bring up the e-paper display, show a text label, 
-force a refresh, wait a few seconds, and then replace it with an image.  
-It uses the **LVGL graphics library** integrated with Zephyr RTOS.
+This snippet demonstrates how to bring up the e-paper display and display an image
+
+1. **Include the image .c file in your `main.c`**
 
 ```c
-display_blanking_off(display_dev);
+#include "Battery_Resized.c"
 
 ```
 
-- Turns off panel blanking so the e-paper display can start showing content.
-- Required before drawing anything on the screen.
+2. **Create the battery image object**
 
-```c
-/* Simple demo UI */
-lv_obj_t *label = lv_label_create(lv_screen_active());
-lv_label_set_text(label, "Hello from LVGL!");
-lv_obj_center(label);
-```
+We comment out the "Hello from LVLG" block and replace it with the image object below.
 
-- Creates a label widget on the active LVGL screen.
-- Sets the label text to "Hello from LVGL!".
-- Centers the label on the display.
-
-```c
-/* Force redraw the invalidated areas */
-lv_refr_now(lv_disp_get_default());
-```
-- Immediately triggers LVGL to flush any pending draw operations to the display.
-- Useful on e-paper since you want deterministic, synchronous updates.
-
-```c
-k_sleep(K_SECONDS(5));
-```
-
-- Pauses execution for 5 seconds so the text remains visible
+- References an external image descriptor (Battery_Resized) that was converted using the LVGL image converter.
+- Creates an LVGL image widget on the active screen.
+- Sets the image source to the Battery_Resized asset.
+- Centers the image on the display, replacing the label.
 
 ```c
 extern const lv_image_dsc_t Battery_Resized;
@@ -718,12 +816,7 @@ lv_image_set_src(img, &Battery_Resized);
 lv_obj_center(img);
 ```
 
-- References an external image descriptor (Battery_Resized) that was converted using the LVGL image converter.
-- Creates an LVGL image widget on the active screen.
-- Sets the image source to the Battery_Resized asset.
-- Centers the image on the display, replacing the label.
-
-Building and flashing the board should show the battery icon on the display after 5 seconds
+Building and flashing the board should show the battery icon.
 
 ![Battery On Display](./images/Battery_On_Display.png)
 
