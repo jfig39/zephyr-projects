@@ -106,7 +106,7 @@ We start off my selecting our `epd` as the chosen node which tells Zephyr to sel
 In order for the host device to communicate with the display controller, we use the **Mobile Industry Processor Interface (MIPI) Display Bus Interface (DBI)**. MIPI DBI is a protocol layer on top of our SPI bus that defines how bytes are interpreted by the display controller. It specifies how to differentiate between command and data bytes, how display registers are addressed, and the required sequence of commands to initialize and control the display.
 
 ```dts
-mipi_dbi_epd: mipi_dbi_epd {
+    mipi_dbi_epd: mipi_dbi_epd {
         compatible = "zephyr,mipi-dbi-spi";
         spi-dev = <&spi1>;
         dc-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
@@ -145,8 +145,13 @@ In addition, we define border waveforms for full and partial refreshes. Full ref
 
             /* Optional SSD16xx specifics */
             tssv = <0x80>;
-            full    { border-waveform = <0x05>; };
-            partial { border-waveform = <0x3c>; };
+
+            /* Use partial waveform for small-area updates (label only) */
+            partial { };
+            /* If you later want to tweak border behavior you can also define:
+             * full    { border-waveform = <0x00>; };
+             * partial { border-waveform = <0x00>; };
+             */
         };
 ```
 
@@ -154,14 +159,14 @@ In addition, we define border waveforms for full and partial refreshes. Full ref
 More information on the SSD16xx family can be found in two places in NCS v3.0.2:
 
 1. Driver source code -> located in
-`ncs/v3.0.2/zephyr/drivers/display/ssd16xx.c` (and related files).
+`zephyr/drivers/display/ssd16xx.c` (and related files).
 This contains the C implementation of the driver logic, including SPI transactions, waveform handling, and integration with Zephyr’s display API.
 
-2. Devicetree bindings -> located in the `ncs/v3.0.2/zephyr/dts/bindings/display` directory:
+2. Devicetree bindings -> located in the `zephyr/dts/bindings/display` directory:
 
 - `solomon,ssd16xx-common.yaml` -> Defines properties that are shared across all SSD16xx-based displays (e.g., `tssv`, `border-waveform`, `busy-gpios`).
 
-- `solomon,ssd16xxfb.yaml` → Extends the common binding with properties specific to the framebuffer driver (`ssd16xxfb`), such as `width`, `height`, and `mipi-max-frequency`.
+- `solomon,ssd16xxfb.yaml` -> Extends the common binding with properties specific to the framebuffer driver (`ssd16xxfb`), such as `width`, `height`, and `mipi-max-frequency`.
 
 Zephyr uses solomon,`ssd16xxfb.yaml` as the actual compatible target in your overlay, but it includes the definitions from `solomon,ssd16xx-common.yaml` so that shared properties don’t have to be redefined in every variant.
 
@@ -177,7 +182,6 @@ The following section enables spi1 for use with our e-paper display and configur
     pinctrl-1 = <&spi1_sleep>;
     pinctrl-names = "default", "sleep";
 };
-
 
 &pinctrl {
     spi1_default: spi1_default {
@@ -197,10 +201,10 @@ The following section enables spi1 for use with our e-paper display and configur
 };
 ```
 
-- status = "okay"; — Activates the spi1 peripheral in the devicetree.
-- cs-gpios — Defines the GPIO used for chip select (here, GPIO1 pin 12, active low).
-- pinctrl-0 / pinctrl-1 — Assign the pin control groups for default operation and low-power (sleep) mode.
-- pinctrl-names — Names the two configurations "default" and "sleep" so the driver can switch between them.
+- `status = "okay";` -> Activates the spi1 peripheral in the devicetree.
+- `cs-gpios` -> Defines the GPIO used for chip select (here, GPIO1 pin 12, active low).
+- `pinctrl-0` / `pinctrl-1` -> Assign the pin control groups for default operation and low-power (sleep) mode.
+- `pinctrl-names` -> Names the two configurations "default" and "sleep" so the driver can switch between them.
 
 ### Full Overlay Code
 
@@ -210,6 +214,10 @@ The following section enables spi1 for use with our e-paper display and configur
 / {
     chosen {
         zephyr,display = &epd;
+    };
+
+    aliases {
+        light0 = &lux_sensor;
     };
 
     mipi_dbi_epd: mipi_dbi_epd {
@@ -235,8 +243,13 @@ The following section enables spi1 for use with our e-paper display and configur
 
             /* Optional SSD16xx specifics */
             tssv = <0x80>;
-            full    { border-waveform = <0x05>; };
-            partial { border-waveform = <0x3c>; };
+
+            /* Use partial waveform for small-area updates (label only) */
+            partial { };
+            /* If you later want to tweak border behavior you can also define:
+             * full    { border-waveform = <0x00>; };
+             * partial { border-waveform = <0x00>; };
+             */
         };
     };
 };
@@ -248,7 +261,6 @@ The following section enables spi1 for use with our e-paper display and configur
     pinctrl-1 = <&spi1_sleep>;
     pinctrl-names = "default", "sleep";
 };
-
 
 &pinctrl {
     spi1_default: spi1_default {
@@ -266,7 +278,6 @@ The following section enables spi1 for use with our e-paper display and configur
         };
     };
 };
-
 ```
 
 ## Setting Up the Configuration
@@ -375,7 +386,7 @@ CONFIG_CBPRINTF_FP_SUPPORT=y
 
 *“My build can’t find LVGL font or object symbols”*
 
-- Names vary slightly across SDK versions. If a symbol doesn’t exist, open menuconfig (west build -t menuconfig) → Modules → LVGL and enable any small font (e.g., a Montserrat or unscii font) and at least one object (label is a good start). The exact Kconfig names shown there will be correct for your tree.
+- Names vary slightly across SDK versions. If a symbol doesn’t exist, open menuconfig (west build -t menuconfig) -> Modules -> LVGL and enable any small font (e.g., a Montserrat or unscii font) and at least one object (label is a good start). The exact Kconfig names shown there will be correct for your tree.
 
 ## `main.c`
 
@@ -411,10 +422,10 @@ This returns an instance of the driver containing our configurations defined in 
 We create a display which requires our display's resolution, color format, and buffer information
 
 ```c
-lv_display_t *disp = lv_display_create(PANEL_HOR_RES, PANEL_VER_RES);
-lv_display_set_color_format(disp, LV_COLOR_FORMAT_I1);
-lv_display_set_buffers(disp, draw_buf, NULL, sizeof(draw_buf),
-                       LV_DISPLAY_RENDER_MODE_FULL);
+ lv_display_set_color_format(disp, LV_COLOR_FORMAT_I1);
+    lv_display_set_user_data(disp, (void *)display_dev);
+    lv_display_set_buffers(disp, draw_buf, NULL, sizeof(draw_buf),
+                           LV_DISPLAY_RENDER_MODE_PARTIAL);
 ```
 The Zephyr device pointer is placed inside the LVGL display object so the flush callback can reach it
 
@@ -443,33 +454,25 @@ Purpose: This function takes the rectangle of pixels LVGL renders into `draw_buf
 ### Implementation of `epd_flush_cb`
 
 ```c
-static void epd_flush_cb(lv_display_t *disp, const lv_area_t *area,
-                        uint8_t *px_map)
+/* ------- EPD flush: LVGL I1 -> SSD16xx vertical-tiling ------- */
+static void epd_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
     const struct device *dev = (const struct device *)lv_display_get_user_data(disp);
-    /* Skip the 8‑byte palette */
+
+    /* Skip 8-byte palette for I1 */
     px_map += 8;
 
-    /* Clip the coordinates to the physical panel size */
-    lv_coord_t x1 = area->x1;
-    lv_coord_t y1 = area->y1;
-    lv_coord_t x2 = area->x2;
-    lv_coord_t y2 = area->y2;
-    if (x2 >= 250) {
-        x2 = 249;
-    }
-    if (y2 >= 122) {
-        y2 = 121;
-    }
+    /* Clip to physical (250x122) */
+    lv_coord_t x1 = area->x1, y1 = area->y1, x2 = area->x2, y2 = area->y2;
+    if (x2 >= 250) x2 = 249;
+    if (y2 >= 122) y2 = 121;
     uint16_t w = (uint16_t)(x2 - x1 + 1);
     uint16_t h = (uint16_t)(y2 - y1 + 1);
 
-    /* The SSD16xx driver uses vertical tiling: each byte contains 8
-     * vertical pixels.  We convert the LVGL buffer into this format.
-     * Use a static buffer sized for the worst case: width × ceil(height/8).
-     */
+    /* Convert to vertical-tiling */
     static uint8_t vtbuf[PANEL_HOR_RES * ((PANEL_VER_RES + 7) / 8)];
-    uint16_t groups = (h + 7U) >> 3; /* number of 8‑row groups */
+    uint16_t groups = (h + 7U) >> 3;
+
     for (uint16_t gx = 0; gx < w; gx++) {
         for (uint16_t gy = 0; gy < groups; gy++) {
             uint8_t out_byte = 0;
@@ -477,42 +480,31 @@ static void epd_flush_cb(lv_display_t *disp, const lv_area_t *area,
                 uint16_t row = gy * 8U + bit;
                 uint8_t bit_val = 0;
                 if (row < h) {
-                    /* Compute global coordinates */
                     lv_coord_t px = x1 + gx;
                     lv_coord_t py = y1 + row;
-                    /* Compute index into source buffer (horizontal format) */
-                    uint32_t pixel_index = (uint32_t)py * PANEL_HOR_RES + px;
-                    uint32_t byte_index = pixel_index >> 3;
-                    uint8_t bit_offset = pixel_index & 0x7;
-                    /* For I1 format, MSB corresponds to leftmost pixel */
-                    bit_val = (px_map[byte_index] >> (7 - bit_offset)) & 0x1U;
+                    uint32_t idx = (uint32_t)py * PANEL_HOR_RES + px;
+                    uint32_t byte_index = idx >> 3;
+                    uint8_t bit_off = idx & 0x7;
+                    bit_val = (px_map[byte_index] >> (7 - bit_off)) & 1U;
                 }
-                /* For MSB‑first displays, set bits from MSB to LSB */
-                if (bit_val) {
-                    out_byte |= (1U << (7 - bit));
-                }
+                if (bit_val) out_byte |= (1U << (7 - bit));
             }
-            /* Store vertical tile */
             vtbuf[gy * w + gx] = out_byte;
         }
     }
 
-    /* Prepare descriptor: width and pitch both equal the number of
-     * columns (w).  Height remains the number of pixel rows (h).
-     * Buffer size is w × groups bytes. */
     struct display_buffer_descriptor desc = {
         .buf_size = w * groups,
-        .width    = w,
-        .pitch    = w,
-        /* The SSD16xx driver requires the height to be a multiple of 8
-         * when the screen is vertically tiled.  Use groups*8 rather than
-         * the clipped height to satisfy this constraint. */
-        .height   = (uint16_t)(groups * 8U),
+        .width = w,
+        .pitch = w,
+        .height = (uint16_t)(groups * 8U),
     };
+
     int ret = display_write(dev, x1, y1, &desc, vtbuf);
     if (ret) {
         printk("display_write() failed: %d\n", ret);
     }
+
     lv_display_flush_ready(disp);
 }
 
@@ -532,14 +524,14 @@ This function Makes LVGL's invalidate/flush rectangles line up with the hardware
 
 ```c
 
+/* Align flush areas to 8px boundaries (I1 byte alignment) */
 static void rounder_cb(lv_event_t *e)
 {
     lv_area_t *a = (lv_area_t *)lv_event_get_param(e);
-    a->x1 = (a->x1 & ~0x7);
-    a->x2 = (a->x2 | 0x7);
-    if (a->x2 >= PANEL_HOR_RES) {
-        a->x2 = PANEL_HOR_RES - 1;
-    }
+    a->x1 &= ~0x7;
+    a->x2 |= 0x7;
+    if (a->x2 >= PANEL_HOR_RES) a->x2 = PANEL_HOR_RES - 1;
+    /* y alignment not required for I1; keep as-is to minimize area */
 }
 
 ```
@@ -730,3 +722,316 @@ lv_obj_center(img);
 - Creates an LVGL image widget on the active screen.
 - Sets the image source to the Battery_Resized asset.
 - Centers the image on the display, replacing the label.
+
+Building and flashing the board should show the battery icon on the display after 5 seconds
+
+![Battery On Display](./images/Battery_On_Display.png)
+
+## Adding Dynamic Data
+
+This next Section will cover how to update labels with data from a sensor
+
+For this example I will be using a BH1750 Ambient Light Sensor, although the specific sensor is not that important as we will be focusing on how to update a label with data.
+
+### Note on Finding Sensor/I2C Info
+
+If you need to find information such as the compatable tag and sensor functions you can look up the bindings file for the specifc sensor which is contained in `zephyr/dts/bindings/sensor`. The default I2C pins can be found in `zephyr/boards/<board mfg>/<board.dtsi>`
+
+Here is the additional test code I used to test the sensor. 
+
+I added the I2C and sensor config symbols to the prj.conf
+
+```.conf
+# ─────────────────────────────
+# Low-level peripheral support
+# ─────────────────────────────
+CONFIG_SPI=y
+CONFIG_SPI_NRFX=y
+CONFIG_GPIO=y
+
+# ─────────────────────────────
+# Display driver
+# ─────────────────────────────
+CONFIG_DISPLAY=y
+CONFIG_SSD16XX=y
+
+# ─────────────────────────────
+# LVGL (manual init; you call lv_init / register display yourself)
+# ─────────────────────────────
+CONFIG_LVGL=y
+CONFIG_LV_Z_AUTO_INIT=n
+# CONFIG_LV_Z_USE_DISPLAY is not present in this Zephyr; remove it.
+CONFIG_LV_Z_BITS_PER_PIXEL=1
+CONFIG_LV_Z_MEM_POOL_SIZE=24576
+
+# ─────────────────────────────
+# LVGL widgets / features (enable what you actually use)
+# ─────────────────────────────
+CONFIG_LV_USE_LABEL=y
+CONFIG_LV_LABEL_TEXT_SELECTION=y
+CONFIG_LV_LABEL_LONG_TXT_HINT=y
+CONFIG_LV_USE_LINE=y
+CONFIG_LV_USE_THEME_DEFAULT=y
+CONFIG_LV_USE_IMAGE=y             # v9 name (was LV_USE_IMG)
+
+# ─────────────────────────────
+# Logging
+# ─────────────────────────────
+CONFIG_LOG=y
+CONFIG_LOG_DEFAULT_LEVEL=3
+CONFIG_DISPLAY_LOG_LEVEL_DBG=y
+CONFIG_LV_USE_LOG=y
+CONFIG_LV_LOG_LEVEL_INFO=y
+
+# ─────────────────────────────
+# Robustness / debug
+# ─────────────────────────────
+CONFIG_ASSERT=y
+CONFIG_HW_STACK_PROTECTION=y
+
+# ─────────────────────────────
+# Memory / stacks
+# ─────────────────────────────
+CONFIG_MAIN_STACK_SIZE=8192
+CONFIG_SYSTEM_WORKQUEUE_STACK_SIZE=3072
+
+# ─────────────────────────────
+# C library / printf
+# ─────────────────────────────
+CONFIG_NEWLIB_LIBC=y
+CONFIG_NEWLIB_LIBC_NANO=y
+CONFIG_NEWLIB_LIBC_FLOAT_PRINTF=y
+CONFIG_CBPRINTF_FP_SUPPORT=y
+
+# ─────────────────────────────
+# I2C for reading lux sensor
+# ─────────────────────────────
+
+CONFIG_I2C=y
+CONFIG_SENSOR=y
+CONFIG_BH1750=y
+```
+
+Next I updated the device dree overlay
+```dts
+#include <zephyr/dt-bindings/gpio/gpio.h>
+
+/ {
+    chosen {
+        zephyr,display = &epd;
+    };
+
+    aliases {
+        light0 = &lux_sensor;
+    };
+
+    mipi_dbi_epd: mipi_dbi_epd {
+        compatible = "zephyr,mipi-dbi-spi";
+        spi-dev = <&spi1>;
+        dc-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+        reset-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        epd: ssd16xxfb@0 {
+            compatible = "solomon,ssd1680";
+            status = "okay";
+            reg = <0>;
+            label = "EPD0";
+
+            /* REQUIRED / USED BY DRIVER */
+            width = <256>;
+            height = <128>;
+            rotation = <0>;
+            busy-gpios = <&gpio1 15 GPIO_ACTIVE_HIGH>;
+            mipi-max-frequency = <4000000>;
+
+            /* Optional SSD16xx specifics */
+            tssv = <0x80>;
+            full    { border-waveform = <0x05>; };
+            partial { border-waveform = <0x3c>; };
+        };
+    };
+};
+
+&spi1 {
+    status = "okay";
+    cs-gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
+    pinctrl-0 = <&spi1_default>;
+    pinctrl-1 = <&spi1_sleep>;
+    pinctrl-names = "default", "sleep";
+};
+
+
+&pinctrl {
+    spi1_default: spi1_default {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 1, 10)>,
+                    <NRF_PSEL(SPIM_MOSI, 1, 11)>;
+        };
+    };
+
+    spi1_sleep: spi1_sleep {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 1, 10)>,
+                    <NRF_PSEL(SPIM_MOSI, 1, 11)>;
+            low-power-enable;
+        };
+    };
+};
+
+&i2c0 {
+    status = "okay";
+    pinctrl-0 = <&i2c0_default>;
+    pinctrl-1 = <&i2c0_sleep>;
+    pinctrl-names = "default", "sleep";
+
+    lux_sensor: bh1750@23 {
+        compatible = "rohm,bh1750";
+        reg = <0x23>;              /* or 0x5C if ADDR pin is pulled high */
+        label = "BH1750";
+        status = "okay";
+        // power-gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>; /* optional */
+    };
+};
+
+&pinctrl {
+    /omit-if-no-ref/ i2c0_default: i2c0_default {
+        group1 {
+            psels = <NRF_PSEL(TWIM_SCL, 0, 26)>,  /* SCL = P0.26 */
+                    <NRF_PSEL(TWIM_SDA, 0, 27)>;  /* SDA = P0.27 */
+        };
+    };
+
+    /omit-if-no-ref/ i2c0_sleep: i2c0_sleep {
+        group1 {
+            psels = <NRF_PSEL(TWIM_SCL, 0, 26)>,
+                    <NRF_PSEL(TWIM_SDA, 0, 27)>;
+            low-power-enable;
+        };
+    };
+};
+```
+
+And I made a test main.c to check if the sensor was working as expected
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(app, LOG_LEVEL_INF);
+
+/* Alias from your overlay: aliases { light0 = &lux_sensor; }; */
+#define BH1750_NODE DT_ALIAS(light0)
+
+void main(void)
+{
+    const struct device *dev = DEVICE_DT_GET(BH1750_NODE);
+    if (!device_is_ready(dev)) {
+        LOG_ERR("BH1750 device not ready");
+        return;
+    }
+
+    /* If you power the sensor via a GPIO, consider a 10–20 ms delay here */
+
+    while (1) {
+        int rc = sensor_sample_fetch(dev);
+        if (rc) {
+            LOG_ERR("sample_fetch failed (%d)", rc);
+        } else {
+            struct sensor_value lux;
+            rc = sensor_channel_get(dev, SENSOR_CHAN_LIGHT, &lux);
+            if (!rc) {
+                LOG_INF("Illuminance: %.2f lux", sensor_value_to_double(&lux));
+            } else {
+                LOG_ERR("channel_get failed (%d)", rc);
+            }
+        }
+        k_sleep(K_MSEC(500));
+    }
+}
+
+```
+
+After building and flashing the serial output should look like this 
+
+![Lux sensor output](./images/Lux_sensor_output.png)
+
+Next we will incorperate the Lux sensor output into our existing main code by creating a label to contain the lux sensor data and update it every minute. 
+
+## Incoperating a Dynamic Label Into the Epaper Display
+
+### Design choises
+- We will use a LVGL timer to update the UI - this ensures the UI calls run in the same contect as `lv_timer_handler()`, keeping LVGL thread-safe without extra locking.
+- The timer callback
+    - reads BH1750 (`sensor_sample_fetch + sensor_channel_get`)
+    - formats lux text
+    - updates the label (`lv_label_set_text`)
+
+### Integration steps
+1. Include the sensor headers
+At the top of main.c
+```c
+#include <zephyr/drivers/sensor.h>
+```
+
+2. Get the BH1750 device
+
+Right after you init the display/LVGL (before creating the timer):
+```c
+#define BH1750_NODE DT_ALIAS(light0)
+    const struct device *bh1750 = DEVICE_DT_GET(BH1750_NODE);
+    if (!device_is_ready(bh1750)){
+        printk("BH1750 device not ready\n");
+        return 0;
+    }
+```
+
+3. Create the label and a 60s LVGL timer
+- Create a label after you show the battery image
+- Create an LVGL timer that runs every 60,000ms with `bh1750` passed via `user_data`
+
+Initalize `lux_label` and make callback to update label with sensor data
+```c
+static lv_obj_t *lux_label;
+
+static void lux_timer_cb(lv_timer_t *t){
+    const struct device *dev = (const struct device *)lv_timer_get_user_data(t);
+
+    if (sensor_sample_fetch(dev) == 0){
+        struct sensor_value lux;
+        if (sensor_channel_get(dev, SENSOR_CHAN_LIGHT, &lux) == 0){
+            char buf[32];
+            /* sensor_value)to_double() gives lux as double*/
+            snprintk(buf, siezeof(buf), "Lux: %.2f", sensor_value_to_double(lux));
+            lv_label_set_text(lux_label, buf);
+            /*Re-align if the label size changes*/
+            lv_obj_align(lux_label, LV_ALIGN_Bottom_MID, 0, -8);
+        }
+    }
+}
+
+After we create and center the battery image we register our lable in our main void
+
+```c
+    lux_label = lv_label_create(lv_screen_active());
+    lv_label_set_text(lux_label, "Lux: --.-");
+    lv_obj_align(lux_label, LV_ALIGN_Bottom_MID, 0, -8);
+```
+
+We then register the LVGL timer
+
+```c
+lv_timer_t *lux_timer = lv_timer_create(lux_timer_cb, 60000, (void *)bh1750);
+```
+
+And imidiatley update the screen so we dont wait a minute for the update
+
+
+
+
+
+
+
+
