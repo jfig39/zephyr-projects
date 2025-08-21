@@ -39,3 +39,4 @@ __pycache__/
 *.bin
 *.hex
 *.map
+*.Zone.Identifier*.Zone.Identifier
